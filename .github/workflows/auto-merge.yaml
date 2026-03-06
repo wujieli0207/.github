@@ -1,0 +1,52 @@
+name: Auto Merge Content PRs
+
+on:
+  workflow_call:
+    inputs:
+      content_extensions:
+        description: "File extensions considered safe for auto-merge (comma-separated)"
+        required: false
+        type: string
+        default: "json,md,mdx,txt,yaml,yml"
+
+jobs:
+  auto-merge:
+    if: startsWith(github.head_ref, 'symphony/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check if content-only PR
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=$(gh pr view ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} \
+            --json files -q '.files[].path')
+
+          content_only=true
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            ext="${file##*.}"
+            if ! echo "${{ inputs.content_extensions }}" | tr ',' '\n' | grep -qx "$ext"; then
+              echo "Non-content file: $file (ext: $ext)"
+              content_only=false
+              break
+            fi
+          done <<< "$files"
+
+          echo "content_only=$content_only" >> "$GITHUB_OUTPUT"
+          echo "Content-only: $content_only"
+
+      - name: Auto merge
+        if: steps.check.outputs.content_only == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "PR #${{ github.event.pull_request.number }} is content-only from symphony branch, merging..."
+          gh pr merge ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} \
+            --squash \
+            --delete-branch
