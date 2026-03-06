@@ -16,6 +16,11 @@ on:
         required: false
         type: string
         default: "20"
+      pnpm_version:
+        description: "pnpm version"
+        required: false
+        type: string
+        default: "latest"
     secrets:
       CLOUDFLARE_API_TOKEN:
         required: false
@@ -35,6 +40,8 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: ${{ inputs.pnpm_version }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
